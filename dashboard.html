@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoFixer Dashboard | Lyzo.ai Design</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: '#10b981',
+                        dark: '#0f172a',
+                        card: '#1e293b'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-dark text-white font-sans antialiased p-8">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-12 border-b border-gray-700 pb-6">
+            <div>
+                <h1 class="text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-blue-500">AutoFixer Agent</h1>
+                <p class="text-gray-400 mt-2">Autonomous Crash Resolution System</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="relative flex h-3 w-3">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-3 w-3 bg-brand"></span>
+                </span>
+                <span class="text-brand font-bold uppercase tracking-wider text-sm">System Online</span>
+            </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <div class="bg-card p-6 rounded-xl border border-gray-700 shadow-lg hover:border-brand transition-colors duration-300">
+                <h3 class="text-gray-400 text-sm uppercase tracking-wider mb-2">Logs Watched</h3>
+                <p class="text-3xl font-bold text-white">24,592</p>
+            </div>
+            <div class="bg-card p-6 rounded-xl border border-gray-700 shadow-lg hover:border-blue-500 transition-colors duration-300">
+                <h3 class="text-gray-400 text-sm uppercase tracking-wider mb-2">Crashes Detected</h3>
+                <p class="text-3xl font-bold text-blue-400">14</p>
+            </div>
+            <div class="bg-card p-6 rounded-xl border border-gray-700 shadow-lg hover:border-purple-500 transition-colors duration-300">
+                <h3 class="text-gray-400 text-sm uppercase tracking-wider mb-2">PRs Opened</h3>
+                <p class="text-3xl font-bold text-purple-400">14</p>
+            </div>
+        </div>
+
+        <!-- Recent Activity Feed -->
+        <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+            <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            Recent Fixes
+        </h2>
+        <div class="space-y-4">
+            
+            <div class="bg-card p-4 rounded-lg border border-gray-700 flex justify-between items-center">
+                <div>
+                    <span class="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded border border-red-500/30 uppercase font-bold mr-2">KeyError</span>
+                    <span class="font-mono text-sm">src/app.py:42</span>
+                    <p class="text-gray-400 text-sm mt-1">Unhandled dictionary key accessing 'name'</p>
+                </div>
+                <a href="#" class="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-md text-sm font-bold shadow-lg hover:scale-105 transition-transform">View PR #14</a>
+            </div>
+
+            <div class="bg-card p-4 rounded-lg border border-gray-700 flex justify-between items-center opacity-70">
+                <div>
+                    <span class="bg-yellow-500/20 text-yellow-400 text-xs px-2 py-1 rounded border border-yellow-500/30 uppercase font-bold mr-2">TypeError</span>
+                    <span class="font-mono text-sm">utils/parser.py:12</span>
+                    <p class="text-gray-400 text-sm mt-1">NoneType object is not callable</p>
+                </div>
+                <a href="#" class="px-4 py-2 bg-gray-700 text-white rounded-md text-sm font-bold hover:bg-gray-600 transition-colors">Merged PR #13</a>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>
