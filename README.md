@@ -49,6 +49,12 @@ echo "KeyError: 'name'" >> error.log
 ```
 Watch the terminal as AutoFixer analyzes the error and automatically generates the PR!
 
+## ⚠️ Error Handling & API Failures
+Since AutoFixer relies on two critical APIs (Gemini and GitHub), ensure you monitor the following:
+- **API Expiry/Rate Limits**: If either the `GEMINI_API_KEY` or `GITHUB_TOKEN` expires or hits a rate limit, the agent will log an `APIError` and pause polling for 5 minutes before retrying.
+- **GitHub Token Scope**: If the PR creation fails with `403 Forbidden`, ensure your token has `repo` and `workflow` permissions.
+- **Safe Fallback**: If the LLM generates syntactically invalid code, the local test validation step will catch it, discard the patch, and AutoFixer will NOT open a PR.
+
 ## 🤝 Contributing
 We welcome contributions! Please see `CONTRIBUTING.md` for guidelines.
 
