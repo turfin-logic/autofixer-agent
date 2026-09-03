@@ -1,65 +1,54 @@
+"""AI proposal stage; generated code is never executed or written here."""
+from __future__ import annotations
+
+import json
 import os
 import re
-import json
-import google.generativeai as genai
-from dotenv import load_dotenv
+from typing import Any
 
-load_dotenv()
+MAX_LOG_BYTES = 32_000
+MAX_SOURCE_BYTES = 200_000
+
+class AutoFixError(ValueError):
+    pass
+
+def _json_object(text: str) -> dict[str, Any]:
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE | re.DOTALL)
+    try: value = json.loads(cleaned)
+    except json.JSONDecodeError as exc: raise AutoFixError("model response was not valid JSON") from exc
+    if not isinstance(value, dict): raise AutoFixError("model response must be a JSON object")
+    return value
 
 class AutoFixAgent:
-    def __init__(self):
-        self.name = "AutoFixer AI"
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            print("⚠️ [Agent] Warning: GEMINI_API_KEY not found in .env. Running in mock mode.")
-            self.mock_mode = True
-        else:
-            self.mock_mode = False
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel('gemini-1.5-pro')
+    def __init__(self, *, client: Any | None = None, model: str | None = None) -> None:
+        self.model_name = model or os.getenv("GEMINI_MODEL")
+        self._client = client
+        if self._client is None:
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key: raise AutoFixError("GEMINI_API_KEY is required; publishing is never mocked")
+            if not self.model_name: raise AutoFixError("GEMINI_MODEL must name an approved model")
+            from google import genai
+            self._client = genai.Client(api_key=api_key)
+        if not self.model_name: raise AutoFixError("GEMINI_MODEL must name an approved model")
 
-    def analyze_error(self, error_log):
-        print(f"🧠 [Agent] Analyzing stack trace...")
-        if self.mock_mode:
-            # Fallback mock logic
-            file_match = re.search(r'File "(.*?)", line (\d+)', error_log)
-            if file_match:
-                return {"file": file_match.group(1), "line": file_match.group(2), "error": "MockError", "message": "Mock issue"}
-            return None
+    def analyze_error(self, error_log: str) -> dict[str, Any]:
+        bounded = error_log.encode("utf-8", "replace")[:MAX_LOG_BYTES].decode("utf-8", "replace")
+        response = self._client.models.generate_content(model=self.model_name, contents=(
+            "Return only JSON with string keys file,line,error,message. Identify the likely Python path and line. Do not include code or secrets.\n" + bounded))
+        data = _json_object(response.text or "")
+        if any(not isinstance(data.get(key), (str, int)) for key in ("file", "line", "error", "message")):
+            raise AutoFixError("analysis must contain file, line, error and message")
+        return data
 
-        prompt = f"""
-        Analyze this error log and return ONLY a valid JSON object with these exact keys:
-        - file: the filepath where the root cause occurred
-        - line: the line number
-        - error: the type of error/exception
-        - message: a brief human-readable summary of the crash
+    def generate_patch(self, analysis: dict[str, Any], source: str) -> dict[str, Any]:
+        if len(source.encode("utf-8")) > MAX_SOURCE_BYTES: raise AutoFixError("source file exceeds review limit")
+        response = self._client.models.generate_content(model=self.model_name, contents=(
+            "Return only JSON {\"edits\":[{\"old\":\"exact source\",\"new\":\"replacement\"}]}. "
+            "At most five small exact edits; never return a whole file, markdown or secrets.\n"
+            f"Path: {analysis.get('file')}\nError: {analysis.get('error')}: {analysis.get('message')}\nOriginal source:\n{source}"))
+        return _json_object(response.text or "")
 
-        Error Log:
-        {error_log}
-        """
-        response = self.model.generate_content(prompt)
-        try:
-            # Clean up markdown JSON blocks if present
-            cleaned = response.text.replace('```json', '').replace('```', '').strip()
-            data = json.loads(cleaned)
-            print(f"✅ [Agent] Root cause found in {data.get('file')} at line {data.get('line')}")
-            return data
-        except Exception as e:
-            print(f"❌ [Agent] Failed to parse AI response: {e}")
-            return None
-
-    def generate_fix_code(self, analysis):
-        print(f"💻 [Agent] Generating fix for {analysis['file']}...")
-        if self.mock_mode:
-            return f"# AutoFixer Agent added a safety check to prevent {analysis['error']}\n"
-            
-        prompt = f"""
-        The following file ({analysis['file']}) crashed at line {analysis['line']} with this error:
-        {analysis['error']}: {analysis['message']}
-
-        Write a robust Python fix for this. Provide ONLY the full updated code for the file without any markdown wrappers or explanations. Just pure code.
-        """
-        response = self.model.generate_content(prompt)
-        fixed_code = response.text.replace('```python', '').replace('```', '').strip()
-        return fixed_code
-
+    def generate_fix_code(self, analysis: dict[str, Any], source: str) -> dict[str, Any]:
+        return self.generate_patch(analysis, source)
