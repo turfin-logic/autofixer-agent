@@ -33,6 +33,8 @@ class GitHubBot:
         source = content.decoded_content.decode("utf-8")
         edits = validate_edits(proposal, source); updated = apply_edits(source, edits)
         if updated == source: raise GitHubBotError("proposal makes no change")
+        if self.repo.get_branch("main").commit.sha != base:
+            raise GitHubBotError("default branch moved while reading the source; retry from a fresh snapshot")
         branch = f"autofix-{re.sub(r'[^a-z0-9]+', '-', str(analysis.get('error','error')).lower()).strip('-')}-{uuid.uuid4().hex[:8]}"
         self.repo.create_git_ref(ref=f"refs/heads/{branch}", sha=base)
         self.repo.update_file(path=path, message=f"AutoFixer: propose {analysis.get('error', 'error')} fix", content=updated, sha=content.sha, branch=branch)
@@ -40,3 +42,4 @@ class GitHubBot:
             "## AutoFixer review proposal\n\nGenerated code was not executed. This draft contains bounded exact-text edits.\n\n"
             f"**File:** `{path}`  \n**Reported line:** `{analysis.get('line', '?')}`\n\nRun the project tests and review the diff before merging."))
         return pr.html_url
+
