@@ -1,62 +1,32 @@
-# 🤖 AutoFixer: The Log-to-PR Agent
+# AutoFixer review agent
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![Python](https://img.shields.io/badge/python-3.9%2B-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+AutoFixer turns a bounded error-log excerpt into a draft code proposal for
+human review. It is a review aid, not an autonomous production deployment
+system.
 
-**AutoFixer** is an autonomous AI agent that watches your production server logs. When a crash occurs, it analyzes the stack trace, finds the exact bug in your codebase, writes a fix, and automatically opens a Pull Request on GitHub. 
+## Setup
 
-Wake up to Pull Requests, not Production Crashes.
+Use Python 3.11 or newer, then run `python -m pip install -r requirements.txt`.
+Set `GEMINI_API_KEY` and an explicit approved `GEMINI_MODEL` in a local `.env`.
+Set `GITHUB_TOKEN` and `GITHUB_REPO` only when you intend to create a draft PR.
+Those values are never printed and `.env` is ignored.
 
-## 🚀 Features
-- **Real-time Log Watching:** Instantly detects `Exceptions` and `Errors`.
-- **AI-Powered Root Cause Analysis:** Extracts file paths, line numbers, and understands *why* it crashed.
-- **Autonomous Fix Generation:** Uses LLMs to generate safe, contextual code fixes.
-- **Auto Pull Request:** Creates a new branch, commits the fix, and opens a beautiful PR with explanation.
+## Workflow
 
-## 🚀 Quick Setup
+`python main.py --log error.log` performs analysis only. Add `--publish` to
+create a draft PR after the model returns one to five exact `old`/`new` edits.
+The publisher permits only relative `.py` paths, requires each old fragment to
+match exactly once, parses the resulting source with `ast`, and uses GitHub’s
+blob SHA when updating the branch. It does not execute generated code, merge
+PRs, or clear the input log.
 
-1. **Clone & Install Dependencies**
-   ```bash
-   git clone https://github.com/your-username/autofixer-agent.git
-   cd autofixer-agent
-   pip install -r requirements.txt
-   ```
+The optional `watcher.py` handles truncation and retries a failed callback, but
+it does not implement production backoff, sandboxing or test execution. Run
+the target project’s tests and review every draft manually.
 
-2. **🔑 API Keys Setup (Crucial Step)**
-   AutoFixer requires two API keys to function as a real AI:
-   - **Gemini API Key:** For analyzing errors and generating code fixes.
-   - **GitHub Personal Access Token:** For automatically creating branches and Pull Requests.
-   
-   Copy `.env.example` to `.env` and fill in your keys:
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your GEMINI_API_KEY and GITHUB_TOKEN
-   ```
+## Checks
 
-3. **Start the Agent**
-   ```bash
-   python main.py
-   ```
-
-## 🧪 Try it out
-While `main.py` is running, try simulating a crash by writing an error to `error.log`:
-```bash
-echo "Traceback (most recent call last):" >> error.log
-echo "  File \"src/app.py\", line 42, in <module>" >> error.log
-echo "    print(user['name'])" >> error.log
-echo "KeyError: 'name'" >> error.log
-```
-Watch the terminal as AutoFixer analyzes the error and automatically generates the PR!
-
-## ⚠️ Error Handling & API Failures
-Since AutoFixer relies on two critical APIs (Gemini and GitHub), ensure you monitor the following:
-- **API Expiry/Rate Limits**: If either the `GEMINI_API_KEY` or `GITHUB_TOKEN` expires or hits a rate limit, the agent will log an `APIError` and pause polling for 5 minutes before retrying.
-- **GitHub Token Scope**: If the PR creation fails with `403 Forbidden`, ensure your token has `repo` and `workflow` permissions.
-- **Safe Fallback**: If the LLM generates syntactically invalid code, the local test validation step will catch it, discard the patch, and AutoFixer will NOT open a PR.
-
-## 🤝 Contributing
-We welcome contributions! Please see `CONTRIBUTING.md` for guidelines.
-
-## 📝 License
-MIT License
+`python -m pytest -q`, `ruff check .`, `python -m compileall -q .`, and
+`python -m pip_audit -r requirements.txt` are the intended local checks.
+Generated proposals are unverified until the target project’s test suite is
+run by a reviewer.

@@ -1,46 +1,31 @@
+"""Incremental error-log watcher. Failed callbacks do not consume events."""
+from __future__ import annotations
+
 import time
-import os
-from watchdog.observers import Observer
+from collections.abc import Callable
+from pathlib import Path
+
 from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
+
 
 class LogWatcher(FileSystemEventHandler):
-    def __init__(self, log_file_path, callback):
-        self.log_file_path = log_file_path
-        self.callback = callback
-        self._last_position = 0
-        
-        # Ensure file exists
-        if not os.path.exists(log_file_path):
-            with open(log_file_path, 'w') as f:
-                f.write("")
+    def __init__(self, log_file_path: str, callback: Callable[[str], None], *, max_bytes: int = 32_000) -> None:
+        self.path = Path(log_file_path).resolve(); self.callback = callback; self.max_bytes = max_bytes
+        self.path.touch(exist_ok=True); self._last_position = self.path.stat().st_size
+    def on_modified(self, event: object) -> None:
+        if not getattr(event, "is_directory", False) and Path(getattr(event, "src_path", "")).resolve() == self.path: self._check_for_new_errors()
+    def _check_for_new_errors(self) -> None:
+        if self.path.stat().st_size < self._last_position: self._last_position = 0
+        with self.path.open("rb") as file:
+            file.seek(self._last_position); data = file.read(self.max_bytes + 1); new_position = file.tell()
+        text = data[:self.max_bytes].decode("utf-8", "replace")
+        if "Exception" not in text and "Error:" not in text: self._last_position = new_position; return
+        self.callback(text); self._last_position = new_position
 
-    def on_modified(self, event):
-        if event.src_path == self.log_file_path:
-            self._check_for_new_errors()
-
-    def _check_for_new_errors(self):
-        with open(self.log_file_path, 'r') as file:
-            file.seek(self._last_position)
-            new_logs = file.read()
-            self._last_position = file.tell()
-
-            if "Exception" in new_logs or "Error:" in new_logs:
-                print("🚨 [Watcher] CRASH DETECTED! Analyzing log...")
-                self.callback(new_logs)
-
-def start_watching(log_path, on_error_callback):
-    event_handler = LogWatcher(log_path, on_error_callback)
-    
-    # Watch the directory containing the log file
-    directory = os.path.dirname(log_path) or '.'
-    observer = Observer()
-    observer.schedule(event_handler, directory, recursive=False)
-    observer.start()
-    
-    print(f"👀 [Watcher] Listening for crashes in '{log_path}'...")
+def start_watching(log_path: str, on_error_callback: Callable[[str], None]) -> None:
+    handler = LogWatcher(log_path, on_error_callback); observer = Observer(); observer.schedule(handler, str(handler.path.parent), recursive=False); observer.start()
     try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        observer.stop()
+        while True: time.sleep(1)
+    except KeyboardInterrupt: observer.stop()
     observer.join()
